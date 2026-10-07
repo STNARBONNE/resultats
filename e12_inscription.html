@@ -6,7 +6,7 @@
   est interdite sans l'autorisation écrite préalable de l'auteur (Code de la propriété
   intellectuelle, art. L.122-4 et L.335-2). Voir le fichier LICENCE.
 -->
-<!-- 12 H PAR ÉQUIPES — Inscription publique par QR code — v1.1 — 27/09/2026 -->
+<!-- 12 H PAR ÉQUIPES — Inscription publique par QR code — v1.2 — 07/10/2026 -->
 <html lang="fr">
 <head>
   <meta charset="UTF-8">
@@ -53,6 +53,7 @@
     .msg { padding:12px 14px; border-radius:12px; margin-top:12px; font-weight:500; }
     .msg.err { background:#fef2f2; color:#991b1b; border:1px solid #fecaca; }
     .msg.ok { background:#ecfdf5; color:#065f46; border:1px solid #a7f3d0; }
+    .msg.warn { background:#fffbeb; color:#92400e; border:1px solid #fde68a; }
     .full { text-align:center; padding:30px 16px; }
     .full .ico { font-size:3rem; }
     .recap td { padding:4px 8px 4px 0; vertical-align:top; }
@@ -87,6 +88,12 @@
       </div>
 
       <div id="closedCard" class="card full hidden"><div class="ico">⛔</div><div id="closedText" style="font-weight:600;"></div></div>
+      <div id="waitCard" class="card full hidden" style="border:2px solid #f59e0b;background:#fffbeb;">
+        <div class="ico">⏳</div>
+        <div style="font-weight:700;">Complet : les <span id="waitPostes"></span> postes sont pris.</div>
+        <div style="margin-top:6px;">Vous pouvez inscrire votre équipe en <b>liste d'attente</b>. Si une place se libère, l'organisateur appellera les équipes dans l'ordre d'inscription.</div>
+        <div class="hint" id="waitInfo" style="margin-top:6px;"></div>
+      </div>
 
       <form id="form" class="card" onsubmit="submitTeam(event)">
         <h2>L'équipe</h2>
@@ -134,7 +141,7 @@
     </div>
 
     <div id="screenDone" class="card hidden">
-      <div class="msg ok">✅ Équipe inscrite !</div>
+      <div class="msg ok" id="doneTitle">✅ Équipe inscrite !</div>
       <table class="recap" id="recap" style="margin-top:12px;"></table>
       <button class="sec" onclick="newTeam()">Inscrire une autre équipe</button>
     </div>
@@ -148,7 +155,7 @@
   const CLUB_PATH = 'clubs/' + CONFIG.clubKey;
   const compId = new URLSearchParams(location.search).get('comp');
   const BASE = CLUB_PATH + '/' + compId + '/e12';
-  let ST = E12.settings(), TEAMS = {}, COUNT = 0;
+  let ST = E12.settings(), TEAMS = {}, WAIT = {}, COUNT = 0;
 
   document.getElementById('ver').textContent = E12.VERSION;
   document.getElementById('ver2').textContent = E12.VERSION;
@@ -175,7 +182,7 @@
         db.ref(BASE).on('value', snap => {
           const d = snap.val() || {};
           if (!d.settings) return fail("Cette compétition n'est pas une compétition « 12 h par équipes ».");
-          ST = E12.settings(d.settings); TEAMS = d.teams || {}; COUNT = Math.max(d.count || 0, Object.keys(TEAMS).length);
+          ST = E12.settings(d.settings); TEAMS = d.teams || {}; WAIT = d.waitlist || {}; COUNT = Math.max(d.count || 0, Object.keys(TEAMS).length);
           render();
           if (document.getElementById('screenDone').classList.contains('hidden')) show('screenForm');
         });
@@ -195,10 +202,16 @@
     document.getElementById('infoLine').textContent = info;
     document.getElementById('formatHint').textContent =
       `Format : ${ST.matchs} matches de ${ST.coups} coups par équipe, ${ST.parTireur} matches par tireur, en relais sur le même poste` + (ST.alterne ? ', à tour de rôle (le tireur 1 commence).' : ' (ordre libre).') + ` Maximum par match : ${E12.maxScore('P', ST)} au pistolet, ${E12.fmt(E12.maxScore('C', ST), true)} à la carabine (au dixième).`;
-    const closed = !ST.ouvert || left <= 0;
+    // Inscriptions closes : formulaire masqué. Complet : formulaire conservé pour la liste d'attente.
+    const closed = !ST.ouvert, full = ST.ouvert && left <= 0;
+    const nW = Object.keys(WAIT).length;
     document.getElementById('closedCard').classList.toggle('hidden', !closed);
+    document.getElementById('waitCard').classList.toggle('hidden', !full);
     document.getElementById('form').classList.toggle('hidden', closed);
-    document.getElementById('closedText').textContent = !ST.ouvert ? "Les inscriptions sont closes." : "Complet : les " + ST.postes + " postes sont pris.";
+    document.getElementById('closedText').textContent = "Les inscriptions sont closes.";
+    document.getElementById('waitPostes').textContent = ST.postes;
+    document.getElementById('waitInfo').textContent = nW ? nW + " équipe(s) déjà en liste d'attente." : "Personne en liste d'attente pour l'instant.";
+    document.getElementById('btnSubmit').textContent = full ? "⏳ Inscrire l'équipe en liste d'attente" : "Inscrire l'équipe";
   }
 
   const val = id => document.getElementById(id).value.trim();
@@ -217,36 +230,45 @@
     if (key(a) === key(b)) return formMsg("Les deux tireurs doivent être différents.");
     const disc = discEl.value;
     // Un tireur ne peut être que dans une seule équipe par discipline
-    for (const t of Object.values(TEAMS)) {
+    for (const [lst, where] of [[TEAMS, ''], [WAIT, " (liste d'attente)"]]) for (const t of Object.values(lst)) {
       if (t.disc !== disc) continue;
       for (const p of [t.a, t.b]) if (p && [key(a), key(b)].includes(key(p)))
-        return formMsg(`${E12.person(p)} est déjà inscrit(e) en ${E12.discName(disc)} dans l'équipe « ${E12.teamName(t)} ».`);
+        return formMsg(`${E12.person(p)} est déjà inscrit(e) en ${E12.discName(disc)} dans l'équipe « ${E12.teamName(t)} »${where}.`);
     }
     const team = { nom: val('teamName'), disc, club, a, b, ts: firebase.database.ServerValue.TIMESTAMP };
     const btn = document.getElementById('btnSubmit');
     btn.disabled = true;
     const max = ST.postes;
+    let waiting = false, waitPos = 0;
     db.ref(BASE + '/count').transaction(cur => {
       cur = Math.max(cur || 0, Object.keys(TEAMS).length);
       if (cur >= max) return; // abandon : complet
       return cur + 1;
     }).then(res => {
-      if (!res.committed) throw new Error("FULL");
+      if (!res.committed) {
+        // Complet → liste d'attente (ordre d'arrivée)
+        waiting = true;
+        return db.ref(BASE + '/waitlist').push(team).then(() => db.ref(BASE + '/waitlist').once('value')).then(s => { waitPos = s.numChildren(); });
+      }
       return db.ref(BASE + '/teams').push(team).catch(e => {
         db.ref(BASE + '/count').transaction(c => Math.max(0, (c || 1) - 1));
         throw e;
       });
     }).then(() => {
       const st = E12.discLabel(disc, ST);
+      document.getElementById('doneTitle').className = 'msg ' + (waiting ? 'warn' : 'ok');
+      document.getElementById('doneTitle').textContent = waiting
+        ? `⏳ Équipe inscrite en liste d'attente (position ${waitPos}). L'organisateur vous contactera si une place se libère.`
+        : '✅ Équipe inscrite !';
       document.getElementById('recap').innerHTML =
         `<tr><td><b>Équipe</b></td><td>${E12.esc(E12.teamName(team))}</td></tr>
          <tr><td><b>Discipline</b></td><td>${E12.esc(st)}</td></tr>
          <tr><td><b>Tireur 1</b></td><td>${E12.esc(E12.person(a))}${a.cat ? ' — ' + E12.esc(a.cat) : ''}</td></tr>
          <tr><td><b>Tireur 2</b></td><td>${E12.esc(E12.person(b))}${b.cat ? ' — ' + E12.esc(b.cat) : ''}</td></tr>
-         <tr><td><b>Poste</b></td><td>attribué par l'organisateur</td></tr>`;
+         <tr><td><b>${waiting ? 'Statut' : 'Poste'}</b></td><td>${waiting ? "liste d'attente — position " + waitPos : "attribué par l'organisateur"}</td></tr>`;
       show('screenDone');
     }).catch(e => {
-      formMsg(e.message === 'FULL' ? "Désolé, la compétition vient d'être complète." : "Erreur d'enregistrement : " + (e.message || e));
+      formMsg("Erreur d'enregistrement : " + (e.message || e));
     }).finally(() => { btn.disabled = false; });
   }
 

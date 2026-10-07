@@ -4,17 +4,18 @@
   Voir le fichier LICENCE.
 */
 // ============================================================
-//  12 H PAR ÉQUIPES — fonctions communes (v1.1 — 27/09/2026)
+//  12 H PAR ÉQUIPES — fonctions communes (v1.2 — 07/10/2026)
 //  Utilisé par e12_inscription.html, e12_saisie.html, e12_classement.html
 //  Données Firebase : clubs/<clubKey>/<code compétition>/e12
 //     settings : { postes, matchs, parTireur, coups, distance, date, ouvert, alterne }
 //     count    : nombre d'équipes inscrites (réservation anti sur-booking)
+//     waitlist/<id> : équipes en liste d'attente (même format que teams, ordre = ts)
 //     teams/<id> : { nom, disc ('P'|'C'), club, poste, ts,
 //                    a:{nom,prenom,licence,club,cat}, b:{...},
 //                    m:{ 1:{t:'a'|'b', s:score, x:mouches}, … 6:{…} } }
 // ============================================================
 const E12 = {
-  VERSION: 'v1.1 — 27/09/2026',
+  VERSION: 'v1.2 — 07/10/2026',
   DEFAULTS: { postes: 17, matchs: 6, parTireur: 3, coups: 40, distance: '10 m', date: '', ouvert: true, alterne: true },
   CATS: ["Poussin Fille", "Poussin Garçon", "Benjamin Fille", "Benjamin Garçon", "Minime Fille", "Minime Garçon",
     "Cadet Fille", "Cadet Garçon", "Junior Fille", "Junior Garçon", "Dame 1", "Dame 2", "Dame 3", "Senior 1", "Senior 2", "Senior 3",

@@ -6,7 +6,7 @@
   est interdite sans l'autorisation écrite préalable de l'auteur (Code de la propriété
   intellectuelle, art. L.122-4 et L.335-2). Voir le fichier LICENCE.
 -->
-<!-- 12 H PAR ÉQUIPES — Classements en direct / impression / feuille des postes — v1.1 — 27/09/2026 -->
+<!-- 12 H PAR ÉQUIPES — Classements en direct / impression / feuille des postes — v1.2 — 07/10/2026 -->
 <html lang="fr">
 <head>
   <meta charset="UTF-8">
@@ -109,7 +109,7 @@
   const params = new URLSearchParams(location.search);
   const compId = params.get('comp');
   let VIEW = params.get('vue') || params.get('disc') || 'all';
-  let ST = E12.settings(), TEAMS = {}, NAME = '';
+  let ST = E12.settings(), TEAMS = {}, WAIT = {}, NAME = '';
   const E = E12.esc;
 
   document.getElementById('ver').textContent = E12.VERSION;
@@ -124,7 +124,7 @@
     });
     db.ref(CLUB_PATH + '/' + compId + '/e12').on('value', snap => {
       const d = snap.val() || {};
-      ST = E12.settings(d.settings); TEAMS = d.teams || {};
+      ST = E12.settings(d.settings); TEAMS = d.teams || {}; WAIT = d.waitlist || {};
       render();
     }, e => { document.getElementById('out').innerHTML = '<div class="block none">Erreur de lecture : ' + E(e.message) + '</div>'; });
   }
@@ -233,7 +233,21 @@
     const n = Object.keys(TEAMS).length;
     return `<div class="block"><h2 style="background:#f1f5f9;color:#334155;border-left:6px solid #334155">🖨️ Postes — ${n} équipe(s) / ${ST.postes} postes
       ${sans.length ? `<small style="color:#b91c1c">${sans.length} équipe(s) sans poste — lancer le tirage au sort dans la saisie</small>` : ''}</h2>
-      <table class="postes"><thead><tr><th>Poste</th><th>Équipe</th><th>Tireur 1</th><th>Tireur 2</th>${mh}</tr></thead><tbody>${rows}</tbody></table></div>`;
+      <table class="postes"><thead><tr><th>Poste</th><th>Équipe</th><th>Tireur 1</th><th>Tireur 2</th>${mh}</tr></thead><tbody>${rows}</tbody></table></div>`
+      + waitHtml();
+  }
+
+  // Liste d'attente (ordre d'inscription) sous la feuille des postes
+  function waitHtml() {
+    const ids = Object.keys(WAIT).sort((x, y) => (WAIT[x].ts || 0) - (WAIT[y].ts || 0));
+    if (!ids.length) return '';
+    const who = x => x ? E(E12.person(x)) + `<div class="sub">${E([x.licence, x.cat].filter(Boolean).join(' · '))}</div>` : '';
+    return `<div class="block"><h2 style="background:#fffbeb;color:#92400e;border-left:6px solid #f59e0b">⏳ Liste d'attente — ${ids.length} équipe(s)</h2>
+      <table class="postes"><thead><tr><th>#</th><th>Équipe</th><th>Tireur 1</th><th>Tireur 2</th></tr></thead><tbody>
+      ${ids.map((id, i) => { const t = WAIT[id]; return `<tr><td class="po">${i + 1}</td>
+        <td><div class="nm">${E(E12.teamName(t))}</div><div class="sub">${E(E12.discLabel(t.disc, ST))}${t.club ? ' · ' + E(t.club) : ''}</div></td>
+        <td>${who(t.a)}</td><td>${who(t.b)}</td></tr>`; }).join('')}
+      </tbody></table></div>`;
   }
 </script>
 <div class="gg-copyright" style="text-align:center;font:11px/1.4 system-ui,sans-serif;color:#94a3b8;padding:14px 8px 10px;">© 2026 Gérard GARCIA — Tous droits réservés · Reproduction et réutilisation interdites sans autorisation</div>
