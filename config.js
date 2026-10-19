@@ -12,6 +12,7 @@ const CONFIG = {
   // 2) Identifiant technique = dossier des compétitions dans Firebase.
   //    SANS espaces ni accents (lettres, chiffres, _). Ne plus changer une fois des compétitions créées.
   clubKey: "TIR_NARBONNE",
+    exports: ["sius", "sq"],
 
   // 3) Adresse du site sur GitHub Pages (sert à fabriquer les QR codes)
   //    Forme : https://VOTRE-COMPTE.github.io/NOM-DU-DEPOT
