@@ -6,7 +6,7 @@
   est interdite sans l'autorisation écrite préalable de l'auteur (Code de la propriété
   intellectuelle, art. L.122-4 et L.335-2). Voir le fichier LICENCE.
 -->
-<!-- 12 H PAR ÉQUIPES — Classements en direct / impression / feuille des postes — v1.2 — 07/10/2026 -->
+<!-- 12 H PAR ÉQUIPES — Classements en direct / impression / feuille des postes — v1.3 — 09/11/2026 -->
 <html lang="fr">
 <head>
   <meta charset="UTF-8">
@@ -61,6 +61,7 @@
     .postes td.box { width:70px; height:34px; }
     .postes td.po { font-family:'Rajdhani',sans-serif; font-size:1.4rem; font-weight:700; text-align:center; width:56px; }
     .postes tr.free td { color:#94a3b8; background:#f8fafc; }
+    .postes.liste td { padding:8px 10px; vertical-align:middle; }
     footer { text-align:center; color:var(--muted); font-size:.75rem; margin-top:10px; }
     @media (max-width: 1599px) { .cols { grid-template-columns:1fr; } }
     @media (max-width: 800px) { .hide-sm { display:none; } }
@@ -96,6 +97,7 @@
     <button data-v="P" onclick="setView('P')">Pistolet</button>
     <button data-v="C" onclick="setView('C')">Carabine</button>
     <button data-v="postes" onclick="setView('postes')">Feuille des postes</button>
+    <button data-v="liste" onclick="setView('liste')">Liste des tireurs</button>
     <button onclick="window.print()">🖨️ Imprimer</button>
   </div>
   <div class="legend" id="legend"></div>
@@ -132,7 +134,7 @@
   function setView(v) {
     VIEW = v;
     const u = new URL(location.href);
-    if (v === 'postes') { u.searchParams.set('vue', 'postes'); u.searchParams.delete('disc'); }
+    if (v === 'postes' || v === 'liste') { u.searchParams.set('vue', v); u.searchParams.delete('disc'); }
     else { u.searchParams.delete('vue'); if (v === 'all') u.searchParams.delete('disc'); else u.searchParams.set('disc', v); }
     history.replaceState(null, '', u);
     render();
@@ -143,12 +145,13 @@
     let meta = `${ST.matchs} matches de ${ST.coups} coups par équipe · ${ST.parTireur} matches par tireur` + (ST.alterne ? ' à tour de rôle' : '') + ` · carabine au dixième`;
     if (ST.date) { const [y, m, d] = ST.date.split('-'); meta = d + '/' + m + '/' + y + ' · ' + meta; }
     document.getElementById('meta').textContent = meta;
-    document.getElementById('title').textContent = VIEW === 'postes' ? 'Feuille des postes' : '12 h par équipes';
-    document.getElementById('legend').textContent = VIEW === 'postes' ? '' :
+    document.getElementById('title').textContent = VIEW === 'postes' ? 'Feuille des postes' : VIEW === 'liste' ? 'Liste des tireurs par poste' : '12 h par équipes';
+    document.getElementById('legend').textContent = (VIEW === 'postes' || VIEW === 'liste') ? '' :
       'Classement au total des points ; en cas d\'égalité, départage au nombre de mouches (X). Classements en direct.';
     const dec = null;
     const out = document.getElementById('out');
     if (VIEW === 'postes') { out.innerHTML = postesHtml(dec); return; }
+    if (VIEW === 'liste') { out.innerHTML = listeHtml(); return; }
     const discs = VIEW === 'P' ? ['P'] : VIEW === 'C' ? ['C'] : ['P', 'C'];
     out.innerHTML = `<div class="cols ${discs.length === 1 ? 'one' : ''}">` + discs.map(d =>
       `<div class="col">${teamBlock(d, dec)}${indivBlock(d, dec)}</div>`).join('') + '</div>';
@@ -235,6 +238,19 @@
       ${sans.length ? `<small style="color:#b91c1c">${sans.length} équipe(s) sans poste — lancer le tirage au sort dans la saisie</small>` : ''}</h2>
       <table class="postes"><thead><tr><th>Poste</th><th>Équipe</th><th>Tireur 1</th><th>Tireur 2</th>${mh}</tr></thead><tbody>${rows}</tbody></table></div>`
       + waitHtml();
+  }
+
+  // Liste simple : poste, discipline, tireurs, club (équipes inscrites uniquement, sans cases de matches)
+  function listeHtml() {
+    const ts = Object.values(TEAMS).sort((a, b) => (a.poste || 999) - (b.poste || 999) || E12.teamName(a).localeCompare(E12.teamName(b)));
+    if (!ts.length) return '<div class="block none">Aucune équipe inscrite.</div>';
+    const who = x => x ? `<div class="nm">${E(E12.person(x))}</div><div class="sub">${E([x.licence, x.cat].filter(Boolean).join(' · '))}</div>` : '';
+    const rows = ts.map(t => `<tr><td class="po">${t.poste || '?'}</td>
+        <td>${E(E12.discName(t.disc))}</td>
+        <td>${who(t.a)}</td><td>${who(t.b)}</td>
+        <td>${E(t.club || '')}</td></tr>`).join('');
+    return `<div class="block"><h2 style="background:#f1f5f9;color:#334155;border-left:6px solid #334155">📋 Tireurs par poste — ${ts.length} équipe(s)</h2>
+      <table class="postes liste"><thead><tr><th>Poste</th><th>Discipline</th><th>Tireur 1</th><th>Tireur 2</th><th>Club</th></tr></thead><tbody>${rows}</tbody></table></div>`;
   }
 
   // Liste d'attente (ordre d'inscription) sous la feuille des postes
